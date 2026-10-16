@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Overlay Radar – Racing Analyser</title>
+<style>
+:root{--bg:#eceff1;--card:#fff;--line:#e3e7ea;--tx:#1b1f23;--mu:#6b7680;--lk:#0b73b8;--gr:#14b866;--am:#e08a00;--sky:#e0114f;--chip:#e9ecef;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171c;--card:#1b2229;--line:#2a343d;--tx:#e8edf2;--mu:#93a1ad;--lk:#4aa8e8;--chip:#26303a;--am:#ffb020}}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:12px 12px 70px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.tg{display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--tx);cursor:pointer;font-size:14px;padding:4px}
+.ck{width:22px;height:22px;border-radius:50%;border:2px solid var(--mu);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
+.on .ck{background:#0b5fa5;border-color:#0b5fa5}.on .ck:after{content:"✓"}
+.chip{background:var(--chip);border:0;border-radius:6px;padding:9px 14px;color:var(--tx);cursor:pointer;font-weight:500}
+.chip.on{background:var(--gr);color:#fff}
+select{background:var(--chip);color:var(--tx);border:0;border-radius:6px;padding:9px}
+.promo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.pc{background:var(--card);padding:14px;display:flex;gap:12px;align-items:center;min-width:0}
+.pc b{font-size:16px}.pc a{color:var(--lk);display:block}.big{font-size:26px;font-weight:800;color:var(--am)}.big.g{color:var(--gr)}
+h2{font-size:16px;margin:16px 4px 10px}
+.box{background:var(--card);border:1px solid var(--line);overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;min-width:760px}
+th{font-weight:400;color:var(--mu);font-size:12px;padding:12px 4px;text-align:center}
+td{border-top:1px solid var(--line);border-left:1px solid var(--line);text-align:center;height:70px;padding:0;min-width:48px}
+td.m{border-left:0;text-align:left;padding:0 14px;min-width:170px;position:sticky;left:0;background:var(--card);z-index:1}
+.m b{display:block;font-size:15px}.m small{color:var(--mu);font-size:12px}
+.sky{color:var(--sky);font-weight:900;font-style:italic;float:right;margin-top:6px}
+.play{float:right;border:2px solid var(--mu);color:var(--mu);width:16px;height:16px;border-radius:50%;font-size:8px;display:inline-flex;align-items:center;justify-content:center}
+td.r{cursor:pointer;font-size:12px}td.r:hover{background:var(--chip)}td.cl{color:var(--mu)}
+td.r.up{background:color-mix(in srgb,var(--card),#9aa 8%)}
+td.tip{outline:2px solid var(--gr);outline-offset:-2px;background:rgba(20,184,102,.14);animation:glow 1.8s ease-in-out infinite;position:relative;z-index:2}
+@keyframes glow{0%,100%{box-shadow:0 0 4px var(--gr)}50%{box-shadow:0 0 18px 2px var(--gr)}}
+.fo{display:block;font:italic 800 9px sans-serif;border:1px solid var(--mu);width:20px;margin:0 auto 3px;border-radius:3px;color:var(--mu)}
+.pill{background:#000;color:#fff;font-weight:700;border-radius:3px;padding:2px 9px;font-size:13px;display:inline-block}
+.ovc{display:block;margin:3px auto 0;background:var(--am);color:#000;font-weight:800;font-size:10px;border-radius:9px;padding:1px 6px;width:max-content}
+.dt{background:var(--card);border:2px solid var(--line);padding:12px;margin-bottom:12px;overflow-x:auto}.dt.tipd{border-color:var(--gr);animation:glow 1.8s infinite}
+.dt table{min-width:1000px}.dt th,.dt td{height:auto;padding:7px 6px;border-left:0;text-align:right}.dt th:nth-child(-n+2),.dt td:nth-child(-n+2){text-align:left}
+.dt tr.al td{background:rgba(224,138,0,.15)}.hot{color:var(--am);font-weight:800}.pos{color:var(--gr);font-weight:700}
+.badge{font-size:11px;border:1px solid var(--gr);color:var(--gr);border-radius:99px;padding:1px 8px;margin-left:8px}
+.al{display:flex;gap:8px;flex-wrap:wrap;background:var(--card);border-left:4px solid var(--am);padding:9px 12px;margin-bottom:6px;cursor:pointer}.al b{color:var(--am)}
+.note{color:var(--mu);font-size:12px;margin-top:16px}
+.ticker{position:fixed;left:0;right:0;bottom:0;background:#05090e;border-top:2px solid #22e07a;overflow:hidden;padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px));color:#e8eef5}
+.tk{display:inline-block;white-space:nowrap;will-change:transform}.tk span{margin-right:44px;cursor:pointer}.tk span:hover{text-decoration:underline}.tk em{color:#ffb020;font-style:normal;font-weight:700}.tk i{color:#22e07a;font-style:normal}
+@keyframes mq{to{transform:translateX(-100%)}}
+.map{margin-top:12px;font-size:13px}.map div{display:flex;gap:6px;align-items:center;padding:3px 0;border-top:1px solid var(--line)}.map span{width:100px;color:var(--mu)}.map i{font-style:normal;background:var(--chip);border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-weight:700}.map i.a{background:var(--am);color:#000}
+.res{background:var(--card);border:1px solid var(--line);padding:10px 14px;margin-top:12px;font-size:13px}.res summary{cursor:pointer;font-weight:600}.res li{margin:6px 0}.res textarea{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);margin:8px 0}.sub{color:var(--mu)}
+@media(max-width:560px){.promo{grid-template-columns:1fr}}
+</style></head><body>
+<div class="bar">
+ <button class="tg on" data-f="anz"><span class="ck"></span>Aus/NZ</button>
+ <button class="tg on" data-f="int"><span class="ck"></span>Int'l</button>
+ <button class="chip" data-f="ov">Overlays only</button>
+ <button class="chip" data-f="tip">Tipped only</button>
+ <label class="chip">Threshold <select id="th"><option>20</option><option selected>30</option><option>40</option></select> %</label>
+ <span class="chip" id="st">Loading feed…</span> <button class="chip" id="sim">⚡ Simulate market move</button>
+</div>
+<div class="promo">
+ <div class="pc"><span class="big" id="nA">0</span><div><b>Overlay Alerts</b><a>Live overlays above threshold</a></div></div>
+ <div class="pc"><span class="big g" id="nT">0</span><div><b>Tipped Races</b><a>2+ tipsters on the same runner</a></div></div>
+</div>
+<div id="alerts"></div>
+<div id="detail"></div>
+<h2>🏇 Horses</h2>
+<div class="box"><table id="grid"></table></div>
+<div class="note">Fictional sample data. Each of 5 sources (ratings model 25%, sectionals 20%, tipster consensus 15%, exchange-style model 25%, pace-adjusted speed 15%) is normalised per race and blended into a fair price; the pace source is re-weighted by the race's projected pace shape (hot, genuine or slow) and each runner's run style. Overlay % = best bookmaker odds ÷ fair odds − 1; alerts need the overlay above the threshold and 80%+ of the available sources rating the horse better than the price implies. Green glow = tipped race. Gamble responsibly – 1800 858 858.</div>
+<details class="res"><summary>Research: how tipping companies and race models are built</summary><ul><li><b>Betfair Data Scientists:</b> publish rated prices per runner; "value %" is the gap between the model's win probability and the exchange price. Their Top 5 model is stacked machine learning that scores horse, jockey and trainer ability, 600m sectionals (Punting Form data) and historical BSP, comparing each feature against the next-best runner in the race.</li><li><b>Benter / syndicates:</b> multinomial logit over 100+ factors (form, speed, jockey/trainer, draw, going), calibrated probabilities, blended with the public odds, staked with Kelly. Overlay = model probability above market probability.</li><li><b>Timeform / Beyer:</b> performance vs master ratings, adjusted for pace and race context; speed figures against a par.</li><li><b>Speed maps:</b> built from sectionals, jockey, track and barrier data, separating run style from raw early speed; Racing Life cites roughly 60% of races won by horses settling in the first four (indicative only).</li><li><b>Tipster consensus:</b> Bolton &amp; Benter found a nine-factor fundamental model performed almost identically to the consensus of 48 newspaper tipsters, so consensus is a real signal but kept at 15%.</li><li><b>Open-source:</b> price-blind CatBoost/LightGBM ranking models with softmax win probabilities, compared with Betfair SP to find value.</li></ul><b>Applied here:</b> 5-source blend, pace-shape adjustment, 4-of-5 agreement rule, and ¼-Kelly staking shown on every alert.</details><details class="res"><summary>Free data sources &amp; all Australian bookmakers</summary><ul><li><b>Bookmakers tracked (14):</b> Sportsbet, TAB, Ladbrokes, Neds, bet365, PointsBet, Betr (now including BlueBet), Unibet, Palmerbet, Dabble, Picklebet, Boombet, TopSport, BetRight. Roughly 150 operators are licensed in Australia; these are the main racing books. Check each is still trading, and add any other by name in the feed's <code>odds</code> object.</li><li><b>Betfair:</b> free historical racing CSVs (daily, win/place, with BSP and winners) for training and back-testing your weights; a free basic historical tier at 1-minute odds; a developer app key for exchange prices (check current terms). Betfair Hub also publishes free rated prices.</li><li><b>TAB:</b> its API at api.beta.tab.com.au serves meetings, runners, fixed odds, form and pools; third-party docs say read-only public data uses client credentials. Check Tabcorp's terms before relying on it.</li><li><b>PuntersEdge free tier:</b> 1,500 credits a month covering racing prices from 11+ Australian books, plus best-odds and movers. Enough for periodic checks, not constant polling.</li><li><b>Free ratings and maps:</b> Punting Form (free speed maps and Saturday metro ratings), Racing Life speed maps, Betfair Hub ratings. Good for cross-checking by eye; automated scraping of these or of bookmaker sites normally breaches their terms.</li><li><b>Reality check:</b> no free source gives live odds for all 14 books plus ratings. The realistic free stack is TAB API + PuntersEdge free tier + Betfair exchange and Hub ratings + your own model trained on free BSP data.</li></ul></details>
+<details class="res"><summary>Connect live feed (JSON)</summary><p class="sub">Paste feed JSON from your backend. <code>probs</code> = 5 model win % (ratings, sectionals, tipsters, exchange-style, pace-neutral speed); <code>style</code> = L, P, M, OM or BM; <code>odds</code> = decimal price per bookmaker; use <code>mins</code> or an ISO <code>start</code>. Odds sources: PuntersEdge covers 11–14 AU books (next-to-go, best-odds, movers); exchange data needs a Betfair key or licence.</p><textarea id="fj" rows="5" placeholder='{"meetings":[{"name":"Cranbourne","country":"Australia","region":"anz","sky":true,"races":[{"mins":16,"runners":[{"no":1,"name":"Horse","style":"L","tips":2,"probs":[24,22,26,25,23],"odds":{"Sportsbet":3.1,"TAB":3.2}}]}]}]}'></textarea><button class="chip" id="lf">Load feed</button> <span class="sub" id="fm"></span></details>
+<div class="ticker"><div class="tk" id="tk"></div></div>
+<script>
+let BK=['Sportsbet','TAB','Ladbrokes','Neds','bet365','PointsBet','Betr','Unibet','Palmerbet','Dabble','Picklebet','Boombet','TopSport','BetRight'];const W=[.25,.2,.15,.25,.15];
+const M=[['Cranbourne','Australia','anz',1,16,8],['Bathurst','Australia','anz',0,-200,8],['Taree','Australia','anz',0,-190,8],['Gatton','Australia','anz',1,-150,8],['Sunshine Coast','Australia','anz',1,31,8],['Penola','Australia','anz',1,-120,7],['Launceston','Australia','anz',1,9,8],['Gore','New Zealand','anz',0,-240,9],['Izmir','Turkey','int',0,-300,8]].map(a=>({name:a[0],c:a[1],reg:a[2],sky:a[3],start:a[4],n:a[5]}));
+let s=7;const rnd=()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const A=['Silver','Coastal','Iron','Velvet','Blue','Grand','Rapid','Ghost','Opal','Brass','Quiet','Hawk','Dusty','Lady','Palm','Reef','Tidal','Sable','Crimson','Golden','Wild','Storm','Royal'],B=['Tempest','Drift','Cadence','Crown','Monsoon','Sundial','Fable','Lantern','Harbour','Meridian','Thunder','Ridge','Plains','Kestrel','Prince','Runner','Whisper','Knight','Gem','Arrow','Legacy','Banner','Comet'];
+M.forEach(m=>{m.races=[];for(let r=0;r<m.n;r++){const n=6+Math.floor(rnd()*5),v=Array.from({length:n},()=>Math.pow(rnd(),1.6)+.1),st=v.reduce((a,b)=>a+b);
+ m.races.push({mins:m.start+r*30,tipped:rnd()<.28,tipN:2+Math.floor(rnd()*3),run:v.map((x,i)=>{const p=x/st,inj=rnd()<.07,ib=Math.floor(rnd()*BK.length),mp=p*(.85+rnd()*.3)*1.12;
+  return{no:i+1,name:A[Math.floor(rnd()*A.length)]+' '+B[Math.floor(rnd()*B.length)],st:['L','P','M','M','OM','BM'][Math.floor(rnd()*6)],p:[0,1,2,3,4].map(()=>p*100*(.8+rnd()*.4)*(inj?1.3:1)),o:BK.map((_,b)=>+Math.min(101,Math.max(1.3,1/mp*(.93+rnd()*.14)*(inj&&b==ib?1.5:1))).toFixed(2)),t:0}})})}});
+const F={anz:1,int:1,ov:0,tip:0};let sel=null;const seen=new Set();
+const $=q=>document.querySelector(q),f2=n=>n.toFixed(2);
+const clock=m=>new Date(Date.now()+m*6e4).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
+function analyse(){const th=+$('#th').value/100,al=[];
+ M.forEach((m,mi)=>m.races.forEach((r,ri)=>{r.al=[];const up=r.mins>0,lp=r.run.filter(h=>h.st=='L').length+.5*r.run.filter(h=>h.st=='P').length;r.shape=lp>=3?'Hot':lp<=1.5?'Slow':'Genuine';const PM={Hot:{L:.85,P:.95,M:1,OM:1.1,BM:1.15},Slow:{L:1.2,P:1.1,M:1,OM:.92,BM:.85},Genuine:{L:1,P:1,M:1.03,OM:1.02,BM:.97}};r.run.forEach(h=>{if(h.p0===undefined)h.p0=h.p[4];h.pp=h.p0==null?null:h.p0*(PM[r.shape][h.st]||1)});const q=(h,i)=>i<4?h.p[i]:h.pp,tot=[0,1,2,3,4].map(i=>r.run.every(h=>q(h,i)!=null)?r.run.reduce((a,h)=>a+q(h,i),0):0),AV=tot.map(x=>x>0),na=AV.filter(Boolean).length,wsum=W.reduce((a,w,i)=>a+(AV[i]?w:0),0);
+  r.run.forEach(h=>{const np=[0,1,2,3,4].map(i=>AV[i]?q(h,i)/tot[i]:null);h.fp=na?np.reduce((a,x,i)=>a+(x==null?0:x*W[i]),0)/wsum:1/r.run.length;h.na=na;h.fair=1/h.fp;h.best=Math.max(...h.o);h.bk=BK[h.o.indexOf(h.best)];h.ov=h.best/h.fair-1;h.ag=np.filter(x=>x!=null&&x>1/h.best).length;h.al=up&&na>0&&h.ov>th&&h.ag>=Math.ceil(.8*na);h.k=Math.max(0,.25*(h.fp*h.best-1)/(h.best-1));h.t=h.tips||0;if(h.al){r.al.push(h);al.push({mi,ri,h})}});
+  const top=[...r.run].sort((a,b)=>b.fp-a.fp);r.top=top.slice(0,3).map(h=>h.no);if(r.tipped&&!r.run.some(h=>h.tips))top[0].t=r.tipN;r.tip=up&&r.run.some(h=>h.t>=2)}));return al}
+function cell(m,r,mi,ri){if(m.n==7&&ri==6&&0)return'';
+ if(m.name=='Gatton'&&ri==7)return'<td class="cl">CLSD</td>';
+ const k=`data-m="${mi}" data-r="${ri}"`;
+ if(r.mins<=0)return`<td class="r" ${k}>${r.top.join(',')}</td>`;
+ const ov=r.al.length?`<span class="ovc">+${Math.round(Math.max(...r.al.map(h=>h.ov))*100)}%</span>`:'';
+ const t=r.mins<60?`<span class="fo">FO</span><span class="pill">${r.mins}m</span>`:clock(r.mins);
+ return`<td class="r up ${r.tip?'tip':''}" ${k}>${t}${ov}</td>`}
+function render(){const al=analyse();$('#nA').textContent=al.length;$('#nT').textContent=M.reduce((a,m)=>a+m.races.filter(r=>r.tip).length,0);
+ $('#alerts').innerHTML=al.slice(0,6).map(a=>`<div class="al" data-m="${a.mi}" data-r="${a.ri}">🚨 <b>OVERLAY</b> ${M[a.mi].name} R${a.ri+1} – #${a.h.no} ${a.h.name}: $${f2(a.h.best)} at ${a.h.bk} vs fair $${f2(a.h.fair)} <b>+${Math.round(a.h.ov*100)}%</b> · ${a.h.ag}/${a.h.na} sources</div>`).join('');
+ const mx=Math.max(...M.map(m=>m.n));
+ $('#grid').innerHTML='<tr><th></th><th>Track Report</th>'+Array.from({length:mx},(_,i)=>`<th>R${i+1}</th>`).join('')+'</tr>'+
+ M.map((m,mi)=>({m,mi})).filter(({m})=>F[m.reg]&&(!F.ov||m.races.some(r=>r.al.length))&&(!F.tip||m.races.some(r=>r.tip))).map(({m,mi})=>`<tr><td class="m">${m.sky?'<span class="sky">SKY1</span>':'<span class="play">▶</span>'}<b>${m.name}</b><small>${m.c}</small></td><td></td>`+Array.from({length:mx},(_,ri)=>m.races[ri]?cell(m,m.races[ri],mi,ri):'<td></td>').join('')+'</tr>').join('');
+ const up=[];al.forEach(a=>up.push(`<span data-m="${a.mi}" data-r="${a.ri}">🚨 <em>${M[a.mi].name} R${a.ri+1}</em> #${a.h.no} ${a.h.name} <i>$${f2(a.h.best)}</i> ${a.h.bk} (fair $${f2(a.h.fair)}, +${Math.round(a.h.ov*100)}%)</span>`));
+ M.forEach((m,mi)=>m.races.forEach((r,ri)=>{if(r.tip)up.push(`<span data-m="${mi}" data-r="${ri}">🟢 TIP ${m.name} R${ri+1}: #${r.run.find(h=>h.t).no} ${r.run.find(h=>h.t).name}</span>`)}));
+ const h=up.join('')||'<span>Scanning markets…</span>';setTicker(h);showDetail();
+ al.forEach(a=>{const k=a.mi+'-'+a.ri+'-'+a.h.no;if(!seen.has(k)){seen.add(k);try{if(window.Notification&&Notification.permission==='granted')new Notification('Overlay: '+a.h.name,{body:`${M[a.mi].name} R${a.ri+1} $${f2(a.h.best)} at ${a.h.bk}, +${Math.round(a.h.ov*100)}%`})}catch(e){}}})}
+function showDetail(){if(!sel)return $('#detail').innerHTML='';const m=M[sel[0]],r=m.races[sel[1]];
+ $('#detail').innerHTML=`<div class="dt ${r.tip?'tipd':''}"><b>${m.name} R${sel[1]+1}</b> <span style="color:var(--mu)">${r.mins>0?clock(r.mins):'Resulted'}</span>${r.tip?'<span class="badge">● TIPPED</span>':''}<table><tr><th>#</th><th>Runner</th><th>Fair</th>${BK.map(b=>`<th>${b}</th>`).join('')}<th>Overlay</th><th>Src</th><th>¼ Kelly</th></tr>${r.run.map(h=>`<tr class="${h.al?'al':''}"><td>${h.no}</td><td>${h.name}${h.t?` <span class="badge">${h.t} tips</span>`:''}</td><td>$${f2(h.fair)}</td>${h.o.map(o=>`<td style="${o==h.best?'font-weight:800':''}">${o?f2(o):'–'}</td>`).join('')}<td class="${h.al?'hot':h.ov>0?'pos':''}">${h.ov>0?'+':''}${Math.round(h.ov*100)}%</td><td>${h.ag}/${h.na}</td><td>${h.al?(h.k*100).toFixed(1)+'%':'–'}</td></tr>`).join('')}</table><div class="map"><b>Speed map · ${r.shape} pace</b>${[['L','Leaders'],['P','On pace'],['M','Midfield'],['OM','Off-midfield'],['BM','Backmarkers']].map(([k,l])=>`<div><span>${l}</span>${r.run.filter(h=>h.st==k).map(h=>`<i class="${h.al?'a':''}">${h.no}</i>`).join('')||'–'}</div>`).join('')}</div></div>`}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-m]');if(t){sel=[+t.dataset.m,+t.dataset.r];showDetail();$('#detail').scrollIntoView({behavior:'smooth',block:'nearest'});return}
+ const b=e.target.closest('[data-f]');if(b){const k=b.dataset.f;F[k]=!F[k];b.classList.toggle('on',!!F[k]);render()}});
+$('#sim').onclick=()=>{M.forEach(m=>m.races.forEach(r=>r.run.forEach(h=>h.o=h.o.map(v=>Math.min(101,Math.max(1.3,+(v*(.85+rnd()*.4)).toFixed(2)))))));render()};
+$('#th').onchange=render;
+function loadFeed(){try{applyFeed(JSON.parse($('#fj').value));$('#fm').textContent='Loaded '+M.length+' meetings'}catch(e){$('#fm').textContent='Feed error: '+e.message}}
+function applyFeed(j){const ks=sel&&M[sel[0]]?[M[sel[0]].name,sel[1]]:null,bk=new Set();
+ j.meetings.forEach(m=>m.races.forEach(r=>r&&r.runners.forEach(h=>Object.keys(h.odds).forEach(k=>bk.add(k)))));
+ BK=[...bk];M.length=0;
+ j.meetings.forEach(m=>{const rs=[];m.races.forEach((r,i)=>{if(r)rs[(r.n||i+1)-1]={mins:r.start?Math.round((new Date(r.start)-Date.now())/6e4):r.mins,tipped:0,tipN:0,run:r.runners.map((h,k)=>({no:h.no||k+1,name:h.name,p:[0,1,2,3,4].map(x=>h.probs&&h.probs[x]!=null?h.probs[x]:null),o:BK.map(b=>h.odds[b]||0),st:h.style||'M',tips:h.tips||0,t:0}))}});M.push({name:m.name,c:m.country||'',reg:m.region||'anz',sky:m.sky?1:0,n:rs.length,races:rs})});
+ const i=ks?M.findIndex(m=>m.name==ks[0]):-1;sel=i<0?null:[i,ks[1]];render()}
+/* Live feed: same-origin Worker endpoint (override with window.FEED_URL) */
+let live=false;
+function setStatus(t){$('#st').textContent=t;$('#sim').style.display=live?'none':''}
+async function pollFeed(){try{const r=await fetch(window.FEED_URL||'/api/feed',{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();
+ if(j.meetings&&j.meetings.length){applyFeed(j);live=true;setStatus('● LIVE '+new Date(j.updated).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+(j.sources||[]).join(', '))}
+ else if(!live)setStatus('SAMPLE DATA – no live sources configured')}catch(e){if(!live)setStatus('SAMPLE DATA – feed unreachable')}}
+$('#lf').onclick=loadFeed;
+let tkHTML='',tkX=0,tkW=1,tkPause=false,tkLast=0;const TK_SPEED=54;/* px per second, constant regardless of content */
+function setTicker(h){if(h===tkHTML)return;tkHTML=h;const el=$('#tk');el.innerHTML=h;const w1=el.scrollWidth||1,n=Math.max(2,Math.ceil(innerWidth*1.2/w1)+1);el.innerHTML=h.repeat(n);tkW=w1;tkX=tkX%w1}
+function tick(t){const dt=Math.min(.1,(t-tkLast)/1000)||0;tkLast=t;if(!tkPause){tkX-=TK_SPEED*dt;if(tkX<=-tkW)tkX+=tkW;$('#tk').style.transform='translateX('+tkX+'px)'}requestAnimationFrame(tick)}
+const tkb=document.querySelector('.ticker');tkb.addEventListener('mouseenter',()=>tkPause=true);tkb.addEventListener('mouseleave',()=>tkPause=false);tkb.addEventListener('touchstart',()=>tkPause=true,{passive:true});tkb.addEventListener('touchend',()=>setTimeout(()=>tkPause=false,4000));
+requestAnimationFrame(tick);
+try{if(window.Notification&&Notification.permission==='default')Notification.requestPermission()}catch(e){}
+render();
+pollFeed();setInterval(pollFeed,30000);
+</script></body></html>

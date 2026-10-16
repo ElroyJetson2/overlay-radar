@@ -1,0 +1,4 @@
+{
+  "_readme": "Optional. Key = 'venue|race|runner' with venue in lowercase. Values are win % from YOUR model or licensed ratings. Provide a value for every runner in a race or the source is ignored for that race. style = L, P, M, OM or BM; tips = number of tipsters naming the runner.",
+  "cranbourne|1|1": { "ratings": 24, "sectionals": 22, "tipsters": 26, "speed": 23, "style": "L", "tips": 3 }
+}

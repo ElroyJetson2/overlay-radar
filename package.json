@@ -1,0 +1,6 @@
+{
+  "name": "overlay-radar",
+  "private": true,
+  "scripts": { "dev": "wrangler dev --test-scheduled", "deploy": "wrangler deploy" },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

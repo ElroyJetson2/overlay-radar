@@ -1,4 +1,4 @@
 {
-  "_readme": "Optional. Key = 'venue|race|runner' with venue in lowercase. Values are win % from YOUR model or licensed ratings. Provide a value for every runner in a race or the source is ignored for that race. style = L, P, M, OM or BM; tips = number of tipsters naming the runner.",
-  "cranbourne|1|1": { "ratings": 24, "sectionals": 22, "tipsters": 26, "speed": 23, "style": "L", "tips": 3 }
+  "_readme": "Optional overrides from YOUR model. Key = 'venue|race|runner' with venue lowercase, letters and digits only (Sunshine Coast = sunshinecoast). Fields (win %): ratings, form, tipsters, speed. Also style (L, P, M, OM, BM) and tips (count of tipsters). Give a value for every runner in a race or that source is ignored for the race.",
+  "cranbourne|1|1": { "ratings": 24, "tipsters": 26, "speed": 23, "style": "L", "tips": 3 }
 }

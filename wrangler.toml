@@ -9,12 +9,14 @@ binding = "ASSETS"
 # Create with:  npx wrangler kv namespace create STATE   -> paste the id below
 [[kv_namespaces]]
 binding = "STATE"
-id = "e5d53f89ded44dc18b45e3e712939b89"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
 [triggers]
 # Every 2 min, 00:00–13:59 UTC (covers Australian racing hours). Uses ~420 KV writes/day (free limit 1,000).
 crons = ["*/2 0-13 * * *"]
 
 [vars]
-PE_INTERVAL_MIN = "35"
+PE_INTERVAL_MIN = "60"
+HUB_INTERVAL_MIN = "30"
+EXTRA_INTERVAL_MIN = "5"
 MAX_TAB_RACES = "15"

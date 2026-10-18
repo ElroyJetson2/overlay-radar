@@ -6,7 +6,7 @@
 import RATINGS from '../data/ratings.json';
 import MODEL from '../data/horse_model.json';
 
-const BOOKS = ['Sportsbet','TAB','Ladbrokes','Neds','bet365','PointsBet','Betr','Unibet','Palmerbet','Dabble','Picklebet','Boombet','TopSport','BetRight'];
+const BOOKS = ['Sportsbet','TAB','Ladbrokes','Neds','bet365','PointsBet','Betr','Unibet','Palmerbet','Dabble','Picklebet','Boombet','TopSport','BetRight','NextBet','TABtouch'];
 const key = (b) => String(b).toLowerCase().replace(/[^a-z0-9]/g, '');
 const CAN = Object.fromEntries(BOOKS.map((b) => [key(b), b]));
 const canon = (b) => CAN[key(b)] || String(b);
@@ -36,14 +36,14 @@ export default {
 async function run(env) {
   const st = (await env.STATE.get('state', 'json')) || {};
   const now = Date.now(), jobs = [];
-  const due = (s, mins) => !s || now - s.ts > mins * 6e4;
-  const job = (k, ek, fn) => jobs.push(fn().then((v) => { st[k] = { ts: now, ...v }; st[ek] = undefined; }).catch((e) => { st[ek] = String(e); }));
+  const due = (k, mins) => now - Math.max((st[k] && st[k].ts) || 0, st[k + 'Try'] || 0) > mins * 6e4 - 15e3; // 15s tolerance for cron jitter; failed attempts also back off
+  const job = (k, ek, fn) => { st[k + 'Try'] = now; jobs.push(fn().then((v) => { st[k] = { ts: now, ...v }; st[ek] = undefined; }).catch((e) => { st[ek] = String(e); })); };
   // Rate-limited sources refresh on their own intervals (free tiers are credit/write limited).
-  if (env.PUNTERSEDGE_KEY && due(st.pe, +env.PE_INTERVAL_MIN || 60)) job('pe', 'peErr', () => puntersEdge(env).then((races) => ({ name: 'PuntersEdge', races })));
+  if (env.PUNTERSEDGE_KEY && due('pe', +env.PE_INTERVAL_MIN || 60)) job('pe', 'peErr', () => puntersEdge(env).then((races) => ({ name: 'PuntersEdge', races })));
   if (env.TAB_CLIENT_ID && env.TAB_CLIENT_SECRET) job('tab', 'tabErr', () => tab(env).then((races) => ({ name: 'TAB', races })));
-  if (env.EXTRA_FEEDS && due(st.extra, +env.EXTRA_INTERVAL_MIN || 5)) job('extra', 'extraErr', () => extra(env).then((races) => ({ name: 'Extra feeds', races })));
-  if (env.BF_APP_KEY && env.BF_USER && env.BF_PASS && due(st.bf, +env.EXCHANGE_INTERVAL_MIN || 2)) job('bf', 'bfErr', () => exchange(env, st).then((races) => ({ name: 'Betfair Exchange', races })));
-  if (env.HUB_RATINGS !== 'off' && due(st.hub, +env.HUB_INTERVAL_MIN || 30)) job('hub', 'hubErr', () => hub(env).then((map) => ({ name: 'Betfair Hub ratings', map })));
+  if (env.EXTRA_FEEDS && due('extra', +env.EXTRA_INTERVAL_MIN || 5)) job('extra', 'extraErr', () => extra(env).then((races) => ({ name: 'Extra feeds', races })));
+  if (env.BF_APP_KEY && env.BF_USER && env.BF_PASS && due('bf', +env.EXCHANGE_INTERVAL_MIN || 2)) job('bf', 'bfErr', () => exchange(env, st).then((races) => ({ name: 'Betfair Exchange', races })));
+  if (env.HUB_RATINGS !== 'off' && due('hub', +env.HUB_INTERVAL_MIN || 30)) job('hub', 'hubErr', () => hub(env).then((map) => ({ name: 'Betfair Hub ratings', map })));
   await Promise.all(jobs);
   st.feed = build(st, now);
   await env.STATE.put('state', JSON.stringify(st)); // one KV write per run (free plan: 1,000/day)
@@ -52,17 +52,25 @@ async function run(env) {
 /* ---------- Adapters ----------
    Race adapters return [{venue,country,no,start,runners:[{no,name,odds:{book:price}}]}]. */
 
-// ADAPT: field names are best-effort; confirm against the PuntersEdge docs. Free tier ~1,500 credits/month.
+// PuntersEdge next-to-go. Shape per PuntersEdge's own tutorial: GET /v1/racing/next-to-go?country=AU returns a list of
+// {start_time, venue, race_number, category, runners:[{number, name, bookmakers:[{key, win_price, place_price}]}]}.
+// Free tier is credit-limited (their pages say 1,500 or 3,000 a month), so it refreshes hourly by default.
+// PE_COUNTRY (default AU; set NZ for New Zealand) and PE_CATEGORIES (default horse; add harness if wanted).
 async function puntersEdge(env) {
-  const r = await fetch('https://api.puntersedge.online/v1/racing/next-to-go?categories=horse', { headers: { 'X-API-Key': env.PUNTERSEDGE_KEY } });
+  const country = env.PE_COUNTRY || 'AU', cats = String(env.PE_CATEGORIES || 'horse').split(',');
+  const r = await fetch(`https://api.puntersedge.online/v1/racing/next-to-go?country=${country}&categories=${cats.join(',')}`, { headers: { 'X-API-Key': env.PUNTERSEDGE_KEY } });
   if (!r.ok) throw new Error('PuntersEdge ' + r.status);
   const j = await r.json();
   const list = Array.isArray(j) ? j : j.races || j.data || [];
-  return list.map((x) => ({
-    venue: x.venue || x.meeting || x.track, country: x.country, no: +(x.race_number || x.number || x.race),
-    start: x.start_time || x.start || x.jump_time,
-    runners: (x.runners || []).map((h) => ({ no: +(h.number || h.runner_number || h.no), name: h.name || h.runner, odds: prices(h.prices || h.odds || h.win_odds) })),
+  return list.filter((x) => !x.category || cats.includes(x.category)).map((x) => ({
+    venue: x.venue, country: x.country || (country === 'NZ' ? 'New Zealand' : 'Australia'), no: +x.race_number, start: x.start_time,
+    runners: (x.runners || []).map((h) => ({ no: +h.number, name: h.name, odds: bookPrices(h.bookmakers) })).filter((h) => Object.keys(h.odds).length),
   })).filter((x) => x.venue && x.no && x.runners.length);
+}
+function bookPrices(list) {
+  const out = {};
+  for (const b of list || []) { const n = +b.win_price; if (n > 1) out[canon(b.key)] = n; }
+  return out;
 }
 function prices(o) {
   const out = {};
@@ -147,7 +155,7 @@ async function extra(env) {
   for (const u of String(env.EXTRA_FEEDS).split(',').map((s) => s.trim()).filter(Boolean)) {
     const r = await fetch(u, { headers: env.EXTRA_FEEDS_AUTH ? { authorization: env.EXTRA_FEEDS_AUTH } : {} });
     if (!r.ok) throw new Error(u + ' ' + r.status);
-    for (const x of (await r.json()).races || []) out.push({ venue: x.venue, country: x.country, no: +x.no, start: x.start, runners: (x.runners || []).map((h) => ({ no: +h.no, name: h.name, odds: prices(h.odds) })) });
+    for (const x of (await r.json()).races || []) out.push({ venue: x.venue, country: x.country, no: +x.no, start: x.start, runners: (x.runners || []).map((h) => ({ no: +h.no, name: h.name, odds: prices(h.odds), tips: +h.tips || 0, style: h.style })) });
   }
   return out;
 }
@@ -231,8 +239,9 @@ function build(st, now) {
     if (!m) races.set(k, (m = { venue: r.venue, country: r.country || 'Australia', no: r.no, start: r.start, runners: new Map() }));
     for (const h of r.runners) {
       let x = m.runners.get(h.no);
-      if (!x) m.runners.set(h.no, (x = { no: h.no, name: h.name, odds: {} }));
+      if (!x) m.runners.set(h.no, (x = { no: h.no, name: h.name, odds: {}, tips: 0, style: null }));
       Object.assign(x.odds, h.odds);
+      x.tips = Math.max(x.tips, h.tips || 0); x.style = x.style || h.style || null;
     }
   }
   const meetings = new Map();
@@ -245,7 +254,7 @@ function build(st, now) {
       const x = RATINGS[vk(m.venue) + '|' + m.no + '|' + h.no] || {};
       const hv = hubMap[vk(m.venue) + '|' + m.no + '|' + h.no] ?? hubMap[vk(m.venue) + '|' + m.no + '|n:' + nm(h.name)];
       if (hv > 1) hubUsed = true;
-      return { no: h.no, name: h.name, odds: h.odds, style: x.style || 'M', tips: x.tips || 0,
+      return { no: h.no, name: h.name, odds: h.odds, style: x.style || h.style || 'M', tips: x.tips || h.tips || 0,
         probs: [x.ratings ?? (hv > 1 ? 100 / hv : null), x.form ?? (form ? form[i] : null), x.tipsters ?? null, calib ? calib[i] : null, x.speed ?? null] };
     });
     if (!meetings.has(m.venue)) meetings.set(m.venue, { name: m.venue, country: m.country, region: /^(australia|new zealand)$/i.test(m.country) ? 'anz' : 'int', sky: false, races: [] });

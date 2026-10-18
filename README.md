@@ -15,7 +15,7 @@ wrangler.toml              Cloudflare config (assets, KV, cron, intervals)
 ## Set up (about 10 minutes)
 
 1. **GitHub:** create a repo and push this folder to `main`.
-2. **KV:** `npm install`, `npx wrangler login`, `npx wrangler kv namespace create STATE`, paste the `id` into `wrangler.toml`.
+2. **KV:** the `STATE` namespace id in `wrangler.toml` is already set to the one in your Cloudflare account. On a fresh account run `npx wrangler kv namespace create STATE` and paste the new `id`.
 3. **GitHub secrets:** `CLOUDFLARE_API_TOKEN` (Edit Cloudflare Workers template) and `CLOUDFLARE_ACCOUNT_ID`.
 4. **Push to `main`.** Live at `https://overlay-radar.<subdomain>.workers.dev`; add a custom domain in the Cloudflare dashboard.
 5. **Optional source keys** (Worker secrets, never committed):
@@ -35,10 +35,10 @@ wrangler.toml              Cloudflare config (assets, KV, cron, intervals)
 | Source | Gives | Key needed | Status |
 |---|---|---|---|
 | **Betfair Hub ratings** (CSV) | Betfair's own thoroughbred rated prices → source slot 1 | none | URL pattern taken from Betfair's 2022 tutorial; **unverified today**. Errors (including unrecognised CSV columns) appear in `/api/health`. Override with `HUB_URL`, disable with `HUB_RATINGS=off`. |
-| **PuntersEdge** | Prices from up to 11 AU books | free key | Field names are best-effort (`ADAPT`). Default refresh 60 min to stay near the free credit allowance. |
+| **PuntersEdge** | Per-bookmaker win prices for the next races (horse only by default) | free key | Response shape taken from PuntersEdge's own tutorial (`/v1/racing/next-to-go?country=AU`, bookmakers list per runner). Not yet run against a real key. Default refresh 60 min; their pages quote 1,500 or 3,000 free credits a month. `PE_COUNTRY=NZ`, `PE_CATEGORIES=horse,harness` to change. Free tier is personal-use only. |
 | **TAB API** | TAB fixed odds, next 15 races | client credentials | Endpoints follow third-party docs (`ADAPT`). |
 | **Betfair Exchange** | Best back price per runner, net of commission (shown as "Betfair Ex"), next 3h, up to 40 races | free delayed App Key + your login | Login endpoint is the documented AU/NZ one; betting base `api-au.betfair.com` (falls back to `api.betfair.com`, override `BF_API_BASE`) is **unverified**. Prices are delayed. 2FA accounts can't use this login. Session cached in KV. Tested against mocked responses only. Commission via `BF_COMMISSION` (default 0.08). |
-| **EXTRA_FEEDS** | Anything else | optional | Plug-in: URLs returning `{"races":[{"venue","country","no","start","runners":[{"no","name","odds":{"Sportsbet":3.1}}]}]}`. Host your own aggregator/collector anywhere and point to it. |
+| **EXTRA_FEEDS** | Anything else, including **tips** (the only way to make races glow green in live mode) | optional | Plug-in: URLs returning `{"races":[{"venue","country","no","start","runners":[{"no","name","odds":{"Sportsbet":3.1},"tips":2,"style":"L"}]}]}`. Host your own aggregator/collector anywhere and point to it. |
 | **BSP model** | Calibrated market + horse form residual → source slot 2 and calibrated consensus → slot 4 | none | Runs nightly in GitHub Actions. |
 
 Not included: scrapers for bookmaker or tipping sites (usually breach terms and get blocked).
@@ -64,6 +64,10 @@ Downloads `dwbfpricesauswin<DDMMYYYY>.csv` from promo.betfair.com (cached in `.c
 3. Scores everything prequentially on the last 20% of races (market vs calibrated vs calibrated+residual) and writes the result to `data/horse_model.json` under `eval`.
 
 The Worker uses the residual only if `useResidual` is true, meaning it beat the calibrated market out of sample. BSP is an efficient price, so that is a high bar; calibration alone still improves the consensus. The script was tested on synthetic Betfair-format files only. Run it once locally and read `eval` before trusting it.
+
+## Tips and alerts
+
+**Green glow = a tip.** A race glows green when either 2+ tipsters name the same runner (via `ratings.json` or `EXTRA_FEEDS`), or when the engine makes its own **model tip**: the runner with the best win chance among those with win chance 20%+, a best price 8%+ over fair, at least 80% of available sources agreeing, and a race shape that doesn't work against its run style. Agreement is counted among **independent ratings only** (Hub or your ratings, form model, tipsters, speed), never the market itself. A race with market prices only can raise an amber **price-outlier** alert but cannot produce a green model tip, because a tip needs an independent view. The race panel shows both numbers: what the indicators say the horse should pay, and the blended fair price (which also weighs the market, 25%). Amber = a value alert (30%+ overlay). The race panel says which kind and why. Browser alerts need the 🔔 button (browsers block prompts without a click).
 
 ## How alerts work
 

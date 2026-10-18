@@ -8,6 +8,8 @@ worker/index.js            static hosting, /api/feed, /api/health, cron refresh,
 scripts/bsp_to_ratings.py  turns Betfair's free BSP CSVs into data/horse_model.json
 data/ratings.json          optional: your own ratings / tips / run styles
 data/horse_model.json      generated: BSP calibration exponent + horse residuals
+data/sectional_model*.json generated: Racing Queensland sectionals ratings (horses, greyhounds)
+scripts/sectionals_model.py Racing Queensland sectionals -> ratings, hidden-ability flags, run styles
 wrangler.toml              Cloudflare config (assets, KV, cron, intervals)
 .github/workflows/         deploy.yml (auto-deploy), update-model.yml (nightly BSP training)
 ```
@@ -65,9 +67,63 @@ Downloads `dwbfpricesauswin<DDMMYYYY>.csv` from promo.betfair.com (cached in `.c
 
 The Worker uses the residual only if `useResidual` is true, meaning it beat the calibrated market out of sample. BSP is an efficient price, so that is a high bar; calibration alone still improves the consensus. The script was tested on synthetic Betfair-format files only. Run it once locally and read `eval` before trusting it.
 
+## Sectionals: horses and greyhounds (Racing Queensland, free)
+
+Racing Queensland publishes a free sectionals CSV for nearly every Queensland meeting (thoroughbred and harness verified; greyhound announced for Brisbane and Ipswich, about 60% of Queensland races). The nightly job downloads them and builds, per horse or dog:
+
+- **A rating** from closing speed and overall time against the field, turned into win chances across today's field (so a weak field helps a good runner automatically). It feeds the "speed" slot, which counts as an **independent** rating.
+- **Hidden-ability flag**: top-20% closing speed but finished in the bottom half. Shown in the race panel as "Form may hide its ability: closing speed 1st of 8 last start but finished 6th".
+- **Run style** (leader, on pace, midfield, off pace, backmarker) from early speed, which drives the pace map with real data.
+
+Everything is gated by an out-of-sample test. `data/sectional_model*.json` records `useSectionals` (did the rating beat a no-information baseline on later races?) and `useMasked` (did flagged runners really win next start more than chance?). If a gate is false, that part is not used.
+
+```
+python scripts/sectionals_model.py --inspect                  # check the real file layout parses
+python scripts/sectionals_model.py --code thoroughbred --days 150
+python scripts/sectionals_model.py --code greyhound --days 150   # page URL is unverified; override with --page-url
+```
+The parser was verified on real Racing Queensland rows and trained end to end on synthetic files in the same format. It has **not** been run on a full real download, and the greyhound page URL and file layout are unconfirmed (use `--inspect`). Coverage is Queensland only: a runner needs 2+ prior Queensland runs to be rated, and unrated runners get the field-average rating.
+
+To use greyhounds in the live feed, set `PE_CATEGORIES=horse,greyhound` (PuntersEdge uses more credits per refresh). Betfair Hub ratings and the Exchange adapter are horse-only.
+
+### State by state (what I could verify)
+
+| State | Thoroughbred | Harness | Greyhound | Status |
+|---|---|---|---|---|
+| **QLD** | Free CSV per meeting (Racing Queensland) | Free CSV (Redcliffe, Marburg) | Free for Brisbane and Ipswich (about 60% of races) | **Built** (horses, greyhounds; harness parses with `--code harness`) |
+| **NSW** | Racing NSW "Punter's Intelligence" product; no open feed verified | Harness Racing NSW publishes sectional PDFs | Nothing verified | Not built |
+| **VIC** | Racing Victoria sectionals via racing.com / Daily Sectionals; no open download verified | HRV Sectionals Hub lets you download any Victorian meeting since 1 Jan 2023 | GRV Race Data (Isolynx) CSV/JSON on Google Drive, being phased out into the Watchdog app | Not built (harness and GRV are the most promising; format and terms to confirm) |
+| **WA** | Racing WA publishes meeting downloads; no sectional feed confirmed | Nothing verified | Nothing verified | Not built |
+| **SA** | Nothing verified | Nothing verified | Nothing verified | Not built |
+| **TAS** | Sectionals by Daily Sectionals shown on Tasracing's form site (free account); reuse unconfirmed | Nothing verified | Nothing verified | Not built |
+| **NT / ACT** | Nothing verified | Nothing verified | Nothing verified | Not built |
+
+I have not built scrapers for sites whose terms restrict automated collection (Racing Australia, racing.com, Racing and Sports and others). If you obtain permission or a licence for any of them, or one of the open sources above proves usable, `sectionals_model.py` already works for any page that links CSVs in the Racing Queensland layout (`--page-url`); other layouts need a small parser added.
+
+## Push notifications (big overlays only)
+
+The Worker checks for opportunities on every refresh and messages your phone when a runner's overlay is at or above your threshold (default **80%**, meaning the best price is at least 1.8x the fair price). It works while your phone and browser are closed. Everything below that, you look at in the app.
+
+**Set up ntfy (free, 5 minutes):**
+1. Install the **ntfy** app (iOS or Android) and subscribe to a topic with a long random name, e.g. `overlay-k7q2x9m4p1z8`. Anyone who knows a ntfy.sh topic name can read it, so treat the name like a password.
+2. `npx wrangler secret put NTFY_TOPIC` and enter that topic.
+3. Optional: `npx wrangler secret put ADMIN_KEY` (any long random string), then test delivery:
+   `curl -H "Authorization: Bearer <ADMIN_KEY>" https://overlay-radar.<subdomain>.workers.dev/api/notify-test`
+4. Optional: set `SITE_URL` (a Worker variable) so tapping a notification opens the app.
+
+**Other channels (any combination):** Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`) or Discord (`DISCORD_WEBHOOK`), all as Worker secrets.
+
+**Change the threshold from the app:** use the **Push alerts ≥** dropdown in the top bar (30% to 200%). The first time, it asks for your `ADMIN_KEY` (stored in this browser only) and saves the value on the server (`POST /api/settings`), where it overrides `NOTIFY_MIN_OVERLAY`. The **Show overlays ≥** dropdown only changes what the app highlights.
+
+**Settings** (Worker variables in `wrangler.toml`): `NOTIFY_MIN_OVERLAY` (percent, default 80, used until you save a value from the app), `NOTIFY_WINDOW_MIN` (only races jumping within this many minutes, default 90), `NOTIFY_OUTLIERS=true` (also alert on price outliers with no independent rating behind them; off by default because a lone huge price is often a stale or erroneous one).
+
+**Behaviour:** a message is sent once per runner, and again only if the overlay grows by 25+ points. Races that are about to jump (under 2 minutes) or have jumped are skipped. At most 5 messages per refresh, biggest first. If every channel fails, it retries on the next refresh. `/api/health` shows the threshold, last send time and any delivery errors.
+
+**Limits:** it only runs during the cron window (00:00-13:59 UTC, covering Australian racing) and can only be as fresh as your sources: PuntersEdge prices refresh hourly by default, and the Betfair delayed key delays Exchange prices, so treat every message as "go and check the book now". The page's own 🔔 button only works while the tab is open and also uses the 80% threshold.
+
 ## Tips and alerts
 
-**Green glow = a tip.** A race glows green when either 2+ tipsters name the same runner (via `ratings.json` or `EXTRA_FEEDS`), or when the engine makes its own **model tip**: the runner with the best win chance among those with win chance 20%+, a best price 8%+ over fair, at least 80% of available sources agreeing, and a race shape that doesn't work against its run style. Agreement is counted among **independent ratings only** (Hub or your ratings, form model, tipsters, speed), never the market itself. A race with market prices only can raise an amber **price-outlier** alert but cannot produce a green model tip, because a tip needs an independent view. The race panel shows both numbers: what the indicators say the horse should pay, and the blended fair price (which also weighs the market, 25%). Amber = a value alert (30%+ overlay). The race panel says which kind and why. Browser alerts need the 🔔 button (browsers block prompts without a click).
+**Green glow = a tip.** A race glows green when either 2+ tipsters name the same runner (via `ratings.json` or `EXTRA_FEEDS`), or when the engine makes its own **model tip**: the runner with the best win chance among those with win chance 20%+, a best price 8%+ over fair, at least 80% of available sources agreeing, and a race shape that doesn't work against its run style. Agreement is counted among **independent ratings only** (Hub or your ratings, tipsters, speed or sectionals). The market and the BSP form model do not count, because the form model is built from the market price. A race with market prices only can raise an amber **price-outlier** alert but cannot produce a green model tip, because a tip needs an independent view. The race panel shows both numbers: what the indicators say the horse should pay, and the blended fair price (which also weighs the market, 25%). Amber = a value alert (30%+ overlay). The race panel says which kind and why. Browser alerts need the 🔔 button (browsers block prompts without a click).
 
 ## How alerts work
 

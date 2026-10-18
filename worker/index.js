@@ -5,6 +5,9 @@
 //  • cron            -> pulls free sources, merges, builds model inputs, stores in KV
 import RATINGS from '../data/ratings.json';
 import MODEL from '../data/horse_model.json';
+import SECT_T from '../data/sectional_model.json';
+import SECT_G from '../data/sectional_model_greyhound.json';
+import { notify, sendAll } from './notify.js';
 
 const BOOKS = ['Sportsbet','TAB','Ladbrokes','Neds','bet365','PointsBet','Betr','Unibet','Palmerbet','Dabble','Picklebet','Boombet','TopSport','BetRight','NextBet','TABtouch'];
 const key = (b) => String(b).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -26,7 +29,20 @@ export default {
       const s = (await env.STATE.get('state', 'json')) || {};
       const ts = (k) => s[k] && s[k].ts;
       return json({ updated: s.feed && s.feed.updated, last: { puntersEdge: ts('pe'), tab: ts('tab'), hub: ts('hub'), extra: ts('extra'), betfairExchange: ts('bf') },
-        errors: { puntersEdge: s.peErr, tab: s.tabErr, hub: s.hubErr, extra: s.extraErr, betfairExchange: s.bfErr }, model: { updated: MODEL.updated, b: MODEL.b, useResidual: MODEL.useResidual, eval: MODEL.eval } });
+        errors: { puntersEdge: s.peErr, tab: s.tabErr, hub: s.hubErr, extra: s.extraErr, betfairExchange: s.bfErr }, model: { updated: MODEL.updated, b: MODEL.b, useResidual: MODEL.useResidual, eval: MODEL.eval }, notify: { threshold: s.feed && s.feed.notify, ...s.notifyInfo } });
+    }
+    if (p === '/api/settings') {
+      if (req.method === 'GET') return json((await env.STATE.get('settings', 'json')) || {});
+      if (req.method === 'POST' && env.ADMIN_KEY && req.headers.get('authorization') === 'Bearer ' + env.ADMIN_KEY) {
+        const v = +((await req.json().catch(() => ({}))).minOverlay);
+        if (!(v >= 10 && v <= 1000)) return json({ error: 'minOverlay must be between 10 and 1000' }, 400);
+        await env.STATE.put('settings', JSON.stringify({ minOverlay: v, updated: Date.now() }));
+        return json({ ok: true, minOverlay: v });
+      }
+      return json({ error: 'unauthorised' }, 401);
+    }
+    if (p === '/api/notify-test' && env.ADMIN_KEY && req.headers.get('authorization') === 'Bearer ' + env.ADMIN_KEY) {
+      return json(await sendAll(env, { title: '✅ Overlay Radar test', message: 'Notifications are working. You will only be messaged for overlays above your threshold.' }));
     }
     return env.ASSETS.fetch(req);
   },
@@ -46,6 +62,8 @@ async function run(env) {
   if (env.HUB_RATINGS !== 'off' && due('hub', +env.HUB_INTERVAL_MIN || 30)) job('hub', 'hubErr', () => hub(env).then((map) => ({ name: 'Betfair Hub ratings', map })));
   await Promise.all(jobs);
   st.feed = build(st, now);
+  const settings = await env.STATE.get('settings', 'json');
+  try { await notify(settings && settings.minOverlay ? { ...env, NOTIFY_MIN_OVERLAY: String(settings.minOverlay) } : env, st, st.feed, now); } catch (e) { st.notifyInfo = { ...(st.notifyInfo || {}), errors: [String(e)] }; }
   await env.STATE.put('state', JSON.stringify(st)); // one KV write per run (free plan: 1,000/day)
 }
 
@@ -63,7 +81,7 @@ async function puntersEdge(env) {
   const j = await r.json();
   const list = Array.isArray(j) ? j : j.races || j.data || [];
   return list.filter((x) => !x.category || cats.includes(x.category)).map((x) => ({
-    venue: x.venue, country: x.country || (country === 'NZ' ? 'New Zealand' : 'Australia'), no: +x.race_number, start: x.start_time,
+    venue: x.venue, code: x.category || 'horse', country: x.country || (country === 'NZ' ? 'New Zealand' : 'Australia'), no: +x.race_number, start: x.start_time,
     runners: (x.runners || []).map((h) => ({ no: +h.number, name: h.name, odds: bookPrices(h.bookmakers) })).filter((h) => Object.keys(h.odds).length),
   })).filter((x) => x.venue && x.no && x.runners.length);
 }
@@ -155,7 +173,7 @@ async function extra(env) {
   for (const u of String(env.EXTRA_FEEDS).split(',').map((s) => s.trim()).filter(Boolean)) {
     const r = await fetch(u, { headers: env.EXTRA_FEEDS_AUTH ? { authorization: env.EXTRA_FEEDS_AUTH } : {} });
     if (!r.ok) throw new Error(u + ' ' + r.status);
-    for (const x of (await r.json()).races || []) out.push({ venue: x.venue, country: x.country, no: +x.no, start: x.start, runners: (x.runners || []).map((h) => ({ no: +h.no, name: h.name, odds: prices(h.odds), tips: +h.tips || 0, style: h.style })) });
+    for (const x of (await r.json()).races || []) out.push({ venue: x.venue, code: x.code || 'horse', country: x.country, no: +x.no, start: x.start, runners: (x.runners || []).map((h) => ({ no: +h.no, name: h.name, odds: prices(h.odds), tips: +h.tips || 0, style: h.style })) });
   }
   return out;
 }
@@ -228,15 +246,25 @@ function formModel(runners, cons) {
   return q.map((x) => (100 * x) / s);
 }
 
+// Sectionals model (scripts/sectionals_model.py): per-runner rating from closing speed + overall time vs the field.
+// Needs 2+ rated runners in 60% of the field; unrated runners get the field-average rating. Gated by useSectionals.
+function sectionalProbs(runners, M) {
+  const info = runners.map((h) => { const e = M.horses[nm(h.name)]; return e && e[1] >= 2 ? { r: e[0], style: e[7], note: e[6] ? e[8] : null } : null; });
+  const known = info.filter(Boolean);
+  if (!M.useSectionals || known.length < Math.ceil(0.6 * runners.length)) return { probs: null, info };
+  const mean = known.reduce((a, x) => a + x.r, 0) / known.length, u = info.map((x) => (M.beta || 0) * (x ? x.r : mean)), mx = Math.max(...u), q = u.map((v) => Math.exp(v - mx)), s = q.reduce((a, x) => a + x, 0);
+  return { probs: q.map((v) => (100 * v) / s), info };
+}
+
 function build(st, now) {
   const srcs = [st.pe, st.tab, st.bf, st.extra].filter((s) => s && s.races);
   const hubMap = (st.hub && st.hub.map) || {};
   let hubUsed = false;
   const races = new Map();
   for (const s of srcs) for (const r of s.races) {
-    const k = vk(r.venue) + '|' + r.no;
+    const code = r.code || 'horse', k = vk(r.venue) + '|' + code + '|' + r.no;
     let m = races.get(k);
-    if (!m) races.set(k, (m = { venue: r.venue, country: r.country || 'Australia', no: r.no, start: r.start, runners: new Map() }));
+    if (!m) races.set(k, (m = { venue: r.venue, code, country: r.country || 'Australia', no: r.no, start: r.start, runners: new Map() }));
     for (const h of r.runners) {
       let x = m.runners.get(h.no);
       if (!x) m.runners.set(h.no, (x = { no: h.no, name: h.name, odds: {}, tips: 0, style: null }));
@@ -249,21 +277,25 @@ function build(st, now) {
     if (m.start && new Date(m.start) < now - 3e5) continue;
     const runners = [...m.runners.values()].sort((a, b) => a.no - b.no);
     const cons = consensus(runners), calib = cons ? power(cons, B) : null, form = formModel(runners, cons);
+    const SM = m.code === 'greyhound' ? SECT_G : SECT_T, sect = sectionalProbs(runners, SM);
     const rows = runners.map((h, i) => {
       // Optional own ratings: data/ratings.json key "venue|race|runner" (venue lowercase, letters+digits only)
       const x = RATINGS[vk(m.venue) + '|' + m.no + '|' + h.no] || {};
-      const hv = hubMap[vk(m.venue) + '|' + m.no + '|' + h.no] ?? hubMap[vk(m.venue) + '|' + m.no + '|n:' + nm(h.name)];
+      const hv = m.code === 'greyhound' ? undefined : hubMap[vk(m.venue) + '|' + m.no + '|' + h.no] ?? hubMap[vk(m.venue) + '|' + m.no + '|n:' + nm(h.name)];
       if (hv > 1) hubUsed = true;
-      return { no: h.no, name: h.name, odds: h.odds, style: x.style || h.style || 'M', tips: x.tips || h.tips || 0,
-        probs: [x.ratings ?? (hv > 1 ? 100 / hv : null), x.form ?? (form ? form[i] : null), x.tipsters ?? null, calib ? calib[i] : null, x.speed ?? null] };
+      const si = sect.info[i];
+      return { no: h.no, name: h.name, odds: h.odds, style: x.style || h.style || (si && si.style) || 'M', tips: x.tips || h.tips || 0, hint: si && SM.useMasked && si.note ? si.note : undefined,
+        probs: [x.ratings ?? (hv > 1 ? 100 / hv : null), x.form ?? (form ? form[i] : null), x.tipsters ?? null, calib ? calib[i] : null, x.speed ?? (sect.probs ? sect.probs[i] : null)] };
     });
-    if (!meetings.has(m.venue)) meetings.set(m.venue, { name: m.venue, country: m.country, region: /^(australia|new zealand)$/i.test(m.country) ? 'anz' : 'int', sky: false, races: [] });
-    meetings.get(m.venue).races.push({ n: m.no, start: m.start, runners: rows });
+    const mk = m.venue + '|' + m.code;
+    if (!meetings.has(mk)) meetings.set(mk, { name: m.venue, code: m.code, country: m.country, region: /^(australia|new zealand)$/i.test(m.country) ? 'anz' : 'int', sky: false, races: [] });
+    meetings.get(mk).races.push({ n: m.no, start: m.start, runners: rows });
   }
   const list = [...meetings.values()];
   list.forEach((m) => m.races.sort((a, b) => a.n - b.n));
   const names = srcs.map((s) => s.name);
   if (hubUsed) names.push('Betfair Hub ratings');
   if (MODEL.useResidual) names.push('BSP form model');
+  if (SECT_T.useSectionals || SECT_G.useSectionals) names.push('RQ sectionals model');
   return { updated: new Date(now).toISOString(), sources: names, meetings: list };
 }

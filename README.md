@@ -121,6 +121,19 @@ The Worker checks for opportunities on every refresh and messages your phone whe
 
 **Limits:** it only runs during the cron window (00:00-13:59 UTC, covering Australian racing) and can only be as fresh as your sources: PuntersEdge prices refresh hourly by default, and the Betfair delayed key delays Exchange prices, so treat every message as "go and check the book now". The page's own 🔔 button only works while the tab is open and also uses the 80% threshold.
 
+## Who to take on: the four looks
+
+The app's **Who to take on** section lists current picks, best first, and the race grid uses the same colours:
+
+| Look | Rule | Meaning |
+|---|---|---|
+| 💎 **Violet glow**: Best bet | A tip (2+ tipsters, or our model's pick) **or** a 50%+ chance, **and** over the odds (overlay above the "Show overlays" threshold with independent ratings agreeing) | The runner the evidence likes, paying more than it should. Shows the best price and bookmaker and a suggested stake (quarter Kelly, capped at 5% of bank). |
+| 🔥 **Red glow**: Strong chance | Blended win chance above 50% | Very likely winner; the price is about right, so it is a confidence pick rather than a value bet. |
+| **Green glow**: Tip | 2+ tipsters, or our model's pick | Tipped, but the price is not far enough over fair to be a best bet. |
+| **Amber chip**: Over the odds | Overlay above the threshold | A price the evidence says is too big, with no tip or 50%+ chance behind it. |
+
+If a race has several, the strongest look wins (violet, then red, then green). Win chance is the blended view (independent ratings plus the market at 25%), not a guarantee; treat 50%+ as "very likely", not "certain".
+
 ## Tips and alerts
 
 **Green glow = a tip.** A race glows green when either 2+ tipsters name the same runner (via `ratings.json` or `EXTRA_FEEDS`), or when the engine makes its own **model tip**: the runner with the best win chance among those with win chance 20%+, a best price 8%+ over fair, at least 80% of available sources agreeing, and a race shape that doesn't work against its run style. Agreement is counted among **independent ratings only** (Hub or your ratings, tipsters, speed or sectionals). The market and the BSP form model do not count, because the form model is built from the market price. A race with market prices only can raise an amber **price-outlier** alert but cannot produce a green model tip, because a tip needs an independent view. The race panel shows both numbers: what the indicators say the horse should pay, and the blended fair price (which also weighs the market, 25%). Amber = a value alert (30%+ overlay). The race panel says which kind and why. Browser alerts need the 🔔 button (browsers block prompts without a click).

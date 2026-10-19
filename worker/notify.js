@@ -43,17 +43,17 @@ export async function notify(env, st, feed, now) {
   for (const m of feed.meetings) for (const r of m.races) {
     const mins = (Date.parse(r.start) - now) / 6e4;
     if (!(mins > 1 && mins <= win)) continue; // can't back a race that has jumped
-    for (const h of analyseRace(r.runners, true, min).runners) if (h.al && (h.nI > 0 || outliers)) hits.push({ m, r, h, mins });
+    analyseRace(r.runners, true, min).runners.forEach((h, i) => { if (h.al && (h.nI > 0 || outliers)) hits.push({ m, r, h, mins, tips: r.runners[i].tips || 0 }); });
   }
   hits.sort((a, b) => b.h.ov - a.h.ov);
   const info = { last: (st.notifyInfo || {}).last, sent: 0, errors: [] };
-  for (const { m, r, h, mins } of hits.slice(0, 5)) {
+  for (const { m, r, h, mins, tips } of hits.slice(0, 5)) {
     const key = vk(m.name) + '|' + (m.code || 'horse') + '|' + r.n + '|' + h.no, prev = st.notified[key];
     if (prev && h.ov < prev.ov + 0.25) continue; // already told you; only repeat if it got 25 points bigger
     const why = h.nI ? `${h.agI}/${h.nI} independent ratings agree` : 'price outlier, no independent rating';
     const msg = {
-      title: `🚨 +${Math.round(h.ov * 100)}% ${m.code === 'greyhound' ? '🐕 ' : ''}${m.name} R${r.n} #${h.no} ${String(h.name || '').replace(/^\s*\d+\.\s*/, '')}`,
-      message: `${money(h.best)} at ${h.bk} vs ${h.fairI ? 'indicators ' + money(h.fairI) + ' (blended fair ' + money(h.fair) + ')' : 'fair ' + money(h.fair)}. ${Math.round(h.fp * 100)}% win chance, ${why}. Jumps in ${Math.round(mins)} min.`,
+      title: `${h.mt || tips >= 2 || h.fp > 0.5 ? '💎' : '🚨'} +${Math.round(h.ov * 100)}% ${m.code === 'greyhound' ? '🐕 ' : ''}${m.name} R${r.n} #${h.no} ${String(h.name || '').replace(/^\s*\d+\.\s*/, '')}`,
+      message: `${money(h.best)} at ${h.bk} vs ${h.fairI ? 'indicators ' + money(h.fairI) + ' (blended fair ' + money(h.fair) + ')' : 'fair ' + money(h.fair)}. ${Math.round(h.fp * 100)}% win chance${h.fp > 0.5 ? ' (strong chance)' : ''}${h.mt || tips >= 2 ? ', tipped' : ''}, ${why}. Jumps in ${Math.round(mins)} min.`,
     };
     const res = await sendAll(env, msg);
     if (res.some((x) => x.ok)) { st.notified[key] = { ts: now, ov: h.ov }; info.sent++; info.last = now; }

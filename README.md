@@ -37,7 +37,7 @@ wrangler.toml              Cloudflare config (assets, KV, cron, intervals)
 | Source | Gives | Key needed | Status |
 |---|---|---|---|
 | **Betfair Hub ratings** (CSV) | Betfair's own thoroughbred rated prices → source slot 1 | none | URL pattern taken from Betfair's 2022 tutorial; **unverified today**. Errors (including unrecognised CSV columns) appear in `/api/health`. Override with `HUB_URL`, disable with `HUB_RATINGS=off`. |
-| **PuntersEdge** | Per-bookmaker win prices for the next races (horse only by default) | free key | Response shape taken from PuntersEdge's own tutorial (`/v1/racing/next-to-go?country=AU`, bookmakers list per runner). Not yet run against a real key. Default refresh 60 min; their pages quote 1,500 or 3,000 free credits a month. `PE_COUNTRY=NZ`, `PE_CATEGORIES=horse,harness` to change. Free tier is personal-use only. |
+| **PuntersEdge** | Per-bookmaker win prices for the next races (horse only by default) | free key | Response shape taken from PuntersEdge's own tutorial (`/v1/racing/next-to-go?country=AU`, bookmakers list per runner). Not yet run against a real key. Asks for the next 60 races (`num_races`) with `include_unresolved=true` (without it ~60% of an Australian card is dropped) and drops stale quotes. Default every 30 min: about 2,500 of the 3,000 free monthly credits (2 credits up to 20 races, 3 for 21-60, 4 for 61-200). Change with `PE_INTERVAL_MIN`, `PE_NUM_RACES`, `PE_COUNTRY` (default AU,NZ), `PE_CATEGORIES` (default horse). Free tier is personal-use only. |
 | **TAB API** | TAB fixed odds, next 15 races | client credentials | Endpoints follow third-party docs (`ADAPT`). |
 | **Betfair Exchange** | Best back price per runner, net of commission (shown as "Betfair Ex"), next 3h, up to 40 races | free delayed App Key + your login | Login endpoint is the documented AU/NZ one; betting base `api-au.betfair.com` (falls back to `api.betfair.com`, override `BF_API_BASE`) is **unverified**. Prices are delayed. 2FA accounts can't use this login. Session cached in KV. Tested against mocked responses only. Commission via `BF_COMMISSION` (default 0.08). |
 | **EXTRA_FEEDS** | Anything else, including **tips** (the only way to make races glow green in live mode) | optional | Plug-in: URLs returning `{"races":[{"venue","country","no","start","runners":[{"no","name","odds":{"Sportsbet":3.1},"tips":2,"style":"L"}]}]}`. Host your own aggregator/collector anywhere and point to it. |
@@ -131,6 +131,8 @@ The app's **Who to take on** section lists current picks, best first, and the ra
 | 🔥 **Red glow**: Strong chance | Blended win chance above 50% | Very likely winner; the price is about right, so it is a confidence pick rather than a value bet. |
 | **Green glow**: Tip | 2+ tipsters, or our model's pick | Tipped, but the price is not far enough over fair to be a best bet. |
 | **Amber chip**: Over the odds | Overlay above the threshold | A price the evidence says is too big, with no tip or 50%+ chance behind it. |
+
+**The four summary cards at the top are clickable.** Each opens the full list behind its number (Best Bets, Strong Chances, Tipped Races, Overlay Alerts), sorted by overlay; click a row to open that race, click the card again or the ✕ to close. The card numbers count every race in the feed, regardless of the Horses/Greyhounds/Aus-NZ toggles.
 
 If a race has several, the strongest look wins (violet, then red, then green). Win chance is the blended view (independent ratings plus the market at 25%), not a guarantee; treat 50%+ as "very likely", not "certain".
 

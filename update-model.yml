@@ -1,0 +1,33 @@
+name: Update BSP model
+on:
+  schedule:
+    - cron: "30 18 * * *"   # daily, after Betfair's AU files are published
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache/bsp
+            .cache/sectionals
+          key: models-${{ github.run_id }}
+          restore-keys: models-
+      - run: python scripts/bsp_to_ratings.py --days 240
+      - name: Racing Queensland sectionals (horses)
+        run: python scripts/sectionals_model.py --code thoroughbred --days 150
+      - name: Racing Queensland sectionals (greyhounds; page URL unverified, so failure is tolerated)
+        continue-on-error: true
+        run: python scripts/sectionals_model.py --code greyhound --days 150
+      - name: Commit if changed
+        run: |
+          git config user.name "overlay-radar-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/*.json
+          git diff --cached --quiet || (git commit -m "Update BSP model" && git push)

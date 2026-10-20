@@ -16,7 +16,8 @@ id = "e5d53f89ded44dc18b45e3e712939b89"
 crons = ["*/2 0-13 * * *"]
 
 [vars]
-PE_INTERVAL_MIN = "60"
+PE_INTERVAL_MIN = "30"
+PE_NUM_RACES = "60"
 HUB_INTERVAL_MIN = "30"
 EXTRA_INTERVAL_MIN = "5"
 MAX_TAB_RACES = "15"

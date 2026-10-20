@@ -18,6 +18,8 @@ const nm = (s) => String(s || '').replace(/^\s*\d+\.\s*/, '').replace(/\(.*?\)/g
 const vk = (s) => String(s || '').replace(/\(.*?\)/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=15' } });
 
+const sectSummary = (m) => ({ updated: m.updated, useSectionals: m.useSectionals, useMasked: m.useMasked, runnersRated: Object.keys(m.horses || {}).length, eval: m.eval });
+
 export default {
   async fetch(req, env) {
     const p = new URL(req.url).pathname;
@@ -29,7 +31,9 @@ export default {
       const s = (await env.STATE.get('state', 'json')) || {};
       const ts = (k) => s[k] && s[k].ts;
       return json({ updated: s.feed && s.feed.updated, last: { puntersEdge: ts('pe'), tab: ts('tab'), hub: ts('hub'), extra: ts('extra'), betfairExchange: ts('bf') },
-        errors: { puntersEdge: s.peErr, tab: s.tabErr, hub: s.hubErr, extra: s.extraErr, betfairExchange: s.bfErr }, model: { updated: MODEL.updated, b: MODEL.b, useResidual: MODEL.useResidual, eval: MODEL.eval }, notify: { threshold: s.feed && s.feed.notify, ...s.notifyInfo } });
+        errors: { puntersEdge: s.peErr, tab: s.tabErr, hub: s.hubErr, extra: s.extraErr, betfairExchange: s.bfErr }, model: { updated: MODEL.updated, b: MODEL.b, useResidual: MODEL.useResidual, eval: MODEL.eval },
+        sectionals: { thoroughbred: sectSummary(SECT_T), greyhound: sectSummary(SECT_G) },
+        feed: { sources: s.feed && s.feed.sources, meetings: s.feed ? s.feed.meetings.length : 0, races: s.feed ? s.feed.meetings.reduce((a, m) => a + m.races.length, 0) : 0 }, notify: { threshold: s.feed && s.feed.notify, ...s.notifyInfo } });
     }
     if (p === '/api/settings') {
       if (req.method === 'GET') return json((await env.STATE.get('settings', 'json')) || {});

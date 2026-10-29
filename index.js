@@ -18,7 +18,11 @@ const cname = (c) => (/^(au|aus|australia)$/i.test(c || '') ? 'Australia' : /^(n
 // Normalisers shared with scripts/bsp_to_ratings.py (keep identical)
 const nm = (s) => String(s || '').replace(/^\s*\d+\.\s*/, '').replace(/\(.*?\)/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const vk = (s) => String(s || '').replace(/\(.*?\)/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=15' } });
+// Only the public feed is CORS-open and cacheable; health and settings are private (no CORS, no caching).
+const json = (o, s = 200, pub = false) => new Response(JSON.stringify(o), { status: s, headers: pub ? { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'public, max-age=15' } : { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+// Constant-time admin check (avoids leaking the key through response timing).
+const safeEq = (a, b) => { a = String(a || ''); b = String(b || ''); let d = a.length ^ b.length; for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0); return d === 0; };
+const authed = (req, env) => !!env.ADMIN_KEY && safeEq(req.headers.get('authorization'), 'Bearer ' + env.ADMIN_KEY);
 
 const sectSummary = (m) => ({ updated: m.updated, useSectionals: m.useSectionals, useMasked: m.useMasked, runnersRated: Object.keys(m.horses || {}).length, eval: m.eval });
 
@@ -27,7 +31,7 @@ export default {
     const p = new URL(req.url).pathname;
     if (p === '/api/feed') {
       const s = await env.STATE.get('state', 'json');
-      return json(s && s.feed ? s.feed : { meetings: [], updated: null, sources: [] });
+      return json(s && s.feed ? s.feed : { meetings: [], updated: null, sources: [] }, 200, true);
     }
     if (p === '/api/health') {
       const s = (await env.STATE.get('state', 'json')) || {};
@@ -35,11 +39,12 @@ export default {
       return json({ updated: s.feed && s.feed.updated, last: { puntersEdge: ts('pe'), tab: ts('tab'), hub: ts('hub'), extra: ts('extra'), betfairExchange: ts('bf') },
         errors: { puntersEdge: s.peErr, tab: s.tabErr, hub: s.hubErr, extra: s.extraErr, betfairExchange: s.bfErr }, model: { updated: MODEL.updated, b: MODEL.b, useResidual: MODEL.useResidual, eval: MODEL.eval },
         sectionals: { thoroughbred: sectSummary(SECT_T), greyhound: sectSummary(SECT_G) },
-        feed: { sources: s.feed && s.feed.sources, meetings: s.feed ? s.feed.meetings.length : 0, races: s.feed ? s.feed.meetings.reduce((a, m) => a + m.races.length, 0) : 0 }, notify: { threshold: s.feed && s.feed.notify, ...s.notifyInfo } });
+        feed: { sources: s.feed && s.feed.sources, meetings: s.feed ? s.feed.meetings.length : 0, races: s.feed ? s.feed.meetings.reduce((a, m) => a + m.races.length, 0) : 0 }, notify: { threshold: s.feed && s.feed.notify, ...s.notifyInfo },
+        security: { adminKeySet: !!env.ADMIN_KEY, adminKeyLongEnough: String(env.ADMIN_KEY || '').length >= 16 } });
     }
     if (p === '/api/settings') {
       if (req.method === 'GET') return json((await env.STATE.get('settings', 'json')) || {});
-      if (req.method === 'POST' && env.ADMIN_KEY && req.headers.get('authorization') === 'Bearer ' + env.ADMIN_KEY) {
+      if (req.method === 'POST' && authed(req, env)) {
         const v = +((await req.json().catch(() => ({}))).minOverlay);
         if (!(v >= 10 && v <= 1000)) return json({ error: 'minOverlay must be between 10 and 1000' }, 400);
         await env.STATE.put('settings', JSON.stringify({ minOverlay: v, updated: Date.now() }));
@@ -47,7 +52,7 @@ export default {
       }
       return json({ error: 'unauthorised' }, 401);
     }
-    if (p === '/api/notify-test' && env.ADMIN_KEY && req.headers.get('authorization') === 'Bearer ' + env.ADMIN_KEY) {
+    if (p === '/api/notify-test' && authed(req, env)) {
       return json(await sendAll(env, { title: '✅ Overlay Radar test', message: 'Notifications are working. You will only be messaged for overlays above your threshold.' }));
     }
     return env.ASSETS.fetch(req);
@@ -189,7 +194,7 @@ async function extra(env) {
   const out = [];
   for (const u of String(env.EXTRA_FEEDS).split(',').map((s) => s.trim()).filter(Boolean)) {
     const r = await fetch(u, { headers: env.EXTRA_FEEDS_AUTH ? { authorization: env.EXTRA_FEEDS_AUTH } : {} });
-    if (!r.ok) throw new Error(u + ' ' + r.status);
+    if (!r.ok) throw new Error(new URL(u).host + ' ' + r.status); // host only: the URL may carry a token and /api/health is public
     for (const x of (await r.json()).races || []) out.push({ venue: x.venue, code: x.code || 'horse', country: x.country, no: +x.no, start: x.start, runners: (x.runners || []).map((h) => ({ no: +h.no, name: h.name, odds: prices(h.odds), tips: +h.tips || 0, style: h.style })) });
   }
   return out;

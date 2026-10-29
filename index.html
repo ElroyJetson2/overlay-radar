@@ -71,6 +71,7 @@ td.prime{outline:2px solid #a855f7;outline-offset:-2px;background:rgba(168,85,24
 .tipt.pt{background:#a855f7}.tipt.fl{background:#ff3b30}.big.p{color:#a855f7}.big.f{color:#ff3b30}
 @media(max-width:560px){.pk{grid-template-columns:72px minmax(0,1fr) 40px 60px}.pov{display:none}}
 .tipbox{margin-bottom:14px}
+td.r:focus-visible,.pk:focus-visible,.al:focus-visible{outline:3px solid var(--lk);outline-offset:-3px}
 .hero{background:var(--card);border:2px solid var(--gr);border-radius:16px;padding:18px;animation:glow 1.8s ease-in-out infinite}
 .hero.a{border-color:var(--am);animation:none;box-shadow:0 0 14px rgba(224,138,0,.4)}.hero.n{border-color:var(--line);animation:none}
 .hl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--mu);font-size:13px}
@@ -151,29 +152,29 @@ function renderResults(al){const host=$('#res');if(document.querySelectorAll)doc
  else if(cardView==='T'){title='Tipped races';desc='Two or more tipsters on the same runner, or our model’s pick.';L=races.filter(x=>x.r.tip&&tipOf(x.r)).map(x=>{const h=tipOf(x.r);return pk(x,h,h.tier==='prime'?'prime':h.tier==='flame'?'flame':'tip',h.tier==='prime'?'💎 BEST BET':h.tier==='flame'?'🔥 STRONG':'✅ TIP')})}
  else{title='Overlay alerts';desc='The best price is above your “Show overlays” threshold and independent ratings agree (or, with no ratings, it is a price outlier).';L=al.map(a=>pk({m:M[a.mi],mi:a.mi,r:M[a.mi].races[a.ri],ri:a.ri},a.h,'alr','⚡ OVER ODDS'))}
  L.sort((a,b)=>b.h.ov-a.h.ov||a.r.mins-b.r.mins);
- const row=x=>`<div class="pk ${x.cls}" data-m="${x.mi}" data-r="${x.ri}"><span class="pb">${x.badge}</span><span class="pw"><b>${cl(x.h.name)}</b><small>${x.m.code==='greyhound'?'🐕 ':''}${x.m.name} R${x.ri+1} · ${x.r.mins<60?x.r.mins+' min':clock(x.r.mins)}</small></span><span class="pcn">${Math.round(x.h.fp*100)}%</span><span class="ppr">$${f2(x.h.best)}<small>${x.h.bk}</small></span><span class="pov">${x.h.ov>0?'+'+Math.round(x.h.ov*100)+'%':''}</span></div>`;
+ const row=x=>`<div class="pk ${x.cls}" data-m="${x.mi}" data-r="${x.ri}" tabindex="0" role="button"><span class="pb">${x.badge}</span><span class="pw"><b>${cl(x.h.name)}</b><small>${x.m.code==='greyhound'?'🐕 ':''}${x.m.name} R${x.ri+1} · ${x.r.mins<60?x.r.mins+' min':clock(x.r.mins)}</small></span><span class="pcn">${Math.round(x.h.fp*100)}%</span><span class="ppr">$${f2(x.h.best)}<small>${x.h.bk}</small></span><span class="pov">${x.h.ov>0?'+'+Math.round(x.h.ov*100)+'%':''}</span></div>`;
  host.innerHTML=`<div class="picks"><div class="pkh"><b>${title}</b><span><span class="sub">${L.length} ${L.length==1?'result':'results'}</span> <button class="xb" data-cardclose aria-label="Close">✕</button></span></div><p class="sub">${desc}</p>${L.map(row).join('')||'<p class="sub">Nothing here right now. These appear when the evidence supports them; the “Who to take on” list below shows every current pick.</p>'}</div>`}
 const TR={prime:0,flame:1,tip:2};
 function renderPicks(){const L=[];M.forEach((m,mi)=>m.races.forEach((r,ri)=>{if(r&&r.tierRun&&F[m.reg]&&F[m.code==='greyhound'?'grey':'horse'])L.push({m,mi,ri,r,h:r.tierRun})}));
  L.sort((a,b)=>TR[a.h.tier]-TR[b.h.tier]||b.h.ov-a.h.ov||a.r.mins-b.r.mins);const B={prime:'💎 BEST BET',flame:'🔥 STRONG',tip:'✅ TIP'};
- const rows=L.slice(0,10).map(x=>{const h=x.h;return `<div class="pk ${h.tier}" data-m="${x.mi}" data-r="${x.ri}"><span class="pb">${B[h.tier]}</span><span class="pw"><b>${cl(h.name)}</b><small>${x.m.code==='greyhound'?'🐕 ':''}${x.m.name} R${x.ri+1} · ${x.r.mins<60?x.r.mins+' min':clock(x.r.mins)}</small></span><span class="pcn">${Math.round(h.fp*100)}%</span><span class="ppr">$${f2(h.best)}<small>${h.bk}</small></span><span class="pov">${h.ov>0?'+'+Math.round(h.ov*100)+'%':''}</span></div>`}).join('');
+ const rows=L.slice(0,10).map(x=>{const h=x.h;return `<div class="pk ${h.tier}" data-m="${x.mi}" data-r="${x.ri}" tabindex="0" role="button"><span class="pb">${B[h.tier]}</span><span class="pw"><b>${cl(h.name)}</b><small>${x.m.code==='greyhound'?'🐕 ':''}${x.m.name} R${x.ri+1} · ${x.r.mins<60?x.r.mins+' min':clock(x.r.mins)}</small></span><span class="pcn">${Math.round(h.fp*100)}%</span><span class="ppr">$${f2(h.best)}<small>${h.bk}</small></span><span class="pov">${h.ov>0?'+'+Math.round(h.ov*100)+'%':''}</span></div>`}).join('');
  $('#picks').innerHTML=`<div class="pkh"><b>Who to take on</b><span class="sub">${L.length} pick${L.length==1?'':'s'} right now</span></div><div class="leg"><span class="lg p">💎 Best bet: tip or 50%+ chance AND over the odds</span><span class="lg f">🔥 Strong: 50%+ win chance</span><span class="lg g">✅ Tip</span><span class="lg a">⚡ Over the odds (see alerts)</span></div>${rows||'<p class="sub">No picks right now: nothing meets the rules. Check back soon.</p>'}${L.length>10?`<p class="sub">+ ${L.length-10} more in the grid below</p>`:''}`}
 function cell(m,r,mi,ri){if(m.n==7&&ri==6&&0)return'';
  if(r.closed)return'<td class="cl">CLSD</td>';
- const k=`data-m="${mi}" data-r="${ri}"`;
+ const k=`data-m="${mi}" data-r="${ri}" tabindex="0" role="button"`;
  if(r.mins<=0)return`<td class="r" ${k}>${r.top.join(',')}</td>`;
  const ov=r.al.length?`<span class="ovc">+${Math.round(Math.max(...r.al.map(h=>h.ov))*100)}%</span>`:'';
  const t=r.mins<60?`<span class="fo">FO</span><span class="pill">${r.mins}m</span>`:clock(r.mins);
  return`<td class="r up ${r.tier==='prime'?'prime':r.tier==='flame'?'flame':r.tip?'tip':''}" ${k}>${t}${ov}${r.tier==='prime'?'<span class="tb">💎</span>':r.tier==='flame'?'<span class="tb">🔥</span>':''}</td>`}
 function render(){const al=analyse();$('#nA').textContent=al.length;$('#nT').textContent=M.reduce((a,m)=>a+m.races.filter(r=>r.tip).length,0);$('#nP').textContent=M.reduce((a,m)=>a+m.races.filter(r=>r.tier==='prime').length,0);$('#nF').textContent=M.reduce((a,m)=>a+m.races.filter(r=>r.tier==='flame').length,0);renderPicks();renderResults(al);
- $('#alerts').innerHTML=al.slice(0,6).map(a=>`<div class="al" data-m="${a.mi}" data-r="${a.ri}">🚨 <b>OVERLAY</b> ${M[a.mi].name} R${a.ri+1} – #${a.h.no} ${cl(a.h.name)}: $${f2(a.h.best)} at ${a.h.bk} vs fair $${f2(a.h.fair)} <b>+${Math.round(a.h.ov*100)}%</b> · ${a.h.nI?a.h.agI+'/'+a.h.nI+' ratings agree':'market only'}</div>`).join('');
+ $('#alerts').innerHTML=al.slice(0,6).map(a=>`<div class="al" data-m="${a.mi}" data-r="${a.ri}" tabindex="0" role="button">🚨 <b>OVERLAY</b> ${M[a.mi].name} R${a.ri+1} – #${a.h.no} ${cl(a.h.name)}: $${f2(a.h.best)} at ${a.h.bk} vs fair $${f2(a.h.fair)} <b>+${Math.round(a.h.ov*100)}%</b> · ${a.h.nI?a.h.agI+'/'+a.h.nI+' ratings agree':'market only'}</div>`).join('');
  const mx=Math.max(...M.map(m=>m.n));
- $('#grid').innerHTML='<tr><th></th><th>Track Report</th>'+Array.from({length:mx},(_,i)=>`<th>R${i+1}</th>`).join('')+'</tr>'+
+ $('#grid').innerHTML=!M.length?'<tr><td style="padding:28px;text-align:center;color:var(--mu);border:0">No races on the card right now.</td></tr>':'<tr><th></th><th>Track Report</th>'+Array.from({length:mx},(_,i)=>`<th>R${i+1}</th>`).join('')+'</tr>'+
  M.map((m,mi)=>({m,mi})).filter(({m})=>F[m.reg]&&F[m.code==='greyhound'?'grey':'horse']&&(!F.ov||m.races.some(r=>r.al.length))&&(!F.tip||m.races.some(r=>r.tip))).map(({m,mi})=>`<tr><td class="m">${m.sky?'<span class="sky">SKY1</span>':'<span class="play">▶</span>'}<b>${m.code==='greyhound'?'🐕 ':''}${m.name}</b><small>${m.c}</small></td><td></td>`+Array.from({length:mx},(_,ri)=>m.races[ri]?cell(m,m.races[ri],mi,ri):'<td></td>').join('')+'</tr>').join('');
  const up=[];al.forEach(a=>up.push(`<span data-m="${a.mi}" data-r="${a.ri}">🚨 <em>${M[a.mi].name} R${a.ri+1}</em> #${a.h.no} ${cl(a.h.name)} <i>$${f2(a.h.best)}</i> ${a.h.bk} (fair $${f2(a.h.fair)}, +${Math.round(a.h.ov*100)}%)</span>`));
  M.forEach((m,mi)=>m.races.forEach((r,ri)=>{if(r.tierRun&&(r.tier==='prime'||r.tier==='flame')){const h=r.tierRun;up.unshift(`<span data-m="${mi}" data-r="${ri}">${r.tier==='prime'?'💎 <em>BEST BET</em>':'🔥 <em>STRONG</em>'} ${m.name} R${ri+1}: #${h.no} ${cl(h.name)} <i>$${f2(h.best)}</i> ${h.bk} (${Math.round(h.fp*100)}% chance)</span>`)}else if(r.tip)up.push(`<span data-m="${mi}" data-r="${ri}">🟢 ${r.run.some(h=>h.t>=2)?'TIP':'MODEL TIP'} ${m.name} R${ri+1}: #${tipOf(r).no} ${cl(tipOf(r).name)}</span>`)}));
  const h=up.join('')||'<span>Scanning markets…</span>';setTicker(h);showDetail();
- al.filter(a=>a.h.ov>=pushMin).forEach(a=>{const k=a.mi+'-'+a.ri+'-'+a.h.no;if(!seen.has(k)){seen.add(k);try{if(window.Notification&&Notification.permission==='granted')new Notification('Overlay: '+a.h.name,{body:`${M[a.mi].name} R${a.ri+1} $${f2(a.h.best)} at ${a.h.bk}, +${Math.round(a.h.ov*100)}%`})}catch(e){}}});}
+ al.filter(a=>a.h.ov>=pushMin).forEach(a=>{const k=a.mi+'-'+a.ri+'-'+a.h.no;if(!seen.has(k)){seen.add(k);try{if(window.Notification&&Notification.permission==='granted')new Notification(unesc('Overlay: '+a.h.name),{body:unesc(`${M[a.mi].name} R${a.ri+1} $${f2(a.h.best)} at ${a.h.bk}, +${Math.round(a.h.ov*100)}%`)})}catch(e){}}});}
 const PMX={Hot:{L:.85,P:.95,M:1,OM:1.1,BM:1.15},Slow:{L:1.2,P:1.1,M:1,OM:.92,BM:.85},Genuine:{L:1,P:1,M:1.03,OM:1.02,BM:.97}},STN={L:'Leader',P:'On the pace',M:'Midfield',OM:'Off the pace',BM:'Backmarker'};
 const tipOf=r=>r.run.find(h=>h.t>=2)||r.mtip;let moreOpen=false;const cl=n=>String(n||'').replace(/^\s*\d+\.\s*/,'');
 function showDetail(){if(!sel)return $('#detail').innerHTML='';
@@ -202,22 +203,43 @@ function showDetail(){if(!sel)return $('#detail').innerHTML='';
  const tbl=`<div class="dt" style="border:0;padding:0"><table><tr><th>#</th><th>Runner</th><th>Fair</th>${BK.map(b=>`<th>${b}</th>`).join('')}<th>Overlay</th><th>Src</th><th>¼ Kelly</th></tr>${r.run.map(x=>`<tr class="${x.al?'al':''}"><td>${x.no}</td><td>${cl(x.name)}</td><td>${nodata?'–':'$'+f2(x.fair)}</td>${x.o.map(o=>`<td style="${o==x.best?'font-weight:800':''}">${o?f2(o):'–'}</td>`).join('')}<td class="${x.al?'hot':x.ov>0?'pos':''}">${nodata?'–':(x.ov>0?'+':'')+Math.round(x.ov*100)+'%'}</td><td>${x.agI}/${x.nI}</td><td>${x.al?(x.k*100).toFixed(1)+'%':'–'}</td></tr>`).join('')}</table></div>`;
  const map=`<div class="map"><b>Speed map · ${r.shape} pace</b>${[['L','Leaders'],['P','On pace'],['M','Midfield'],['OM','Off-midfield'],['BM','Backmarkers']].map(([k,l])=>`<div><span>${l}</span>${r.run.filter(x=>x.st==k).map(x=>`<i class="${x.al?'a':''}">${x.no}</i>`).join('')||'–'}</div>`).join('')}</div>`;
  $('#detail').innerHTML=`<div class="tipbox">${hero}<div class="rl">${list}</div><details class="res" ${moreOpen?'open':''} ontoggle="moreOpen=this.open"><summary>All bookmaker prices &amp; speed map</summary>${tbl}${map}</details></div>`}
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('[data-m]')){e.preventDefault();e.target.click()}});
 document.addEventListener('click',e=>{const cd=e.target.closest('[data-card]');if(cd){cardView=cardView===cd.dataset.card?null:cd.dataset.card;render();if(cardView)$('#res').scrollIntoView({behavior:'smooth',block:'nearest'});return}if(e.target.closest('[data-cardclose]')){cardView=null;render();return}if(e.target.closest('[data-close]')){sel=null;showDetail();return}const t=e.target.closest('[data-m]');if(t){sel=[+t.dataset.m,+t.dataset.r];showDetail();$('#detail').scrollIntoView({behavior:'smooth',block:'nearest'});return}
  const b=e.target.closest('[data-f]');if(b){const k=b.dataset.f;F[k]=!F[k];b.classList.toggle('on',!!F[k]);render()}});
 $('#sim').onclick=()=>{M.forEach(m=>m.races.forEach(r=>r.run.forEach(h=>h.o=h.o.map(v=>Math.min(101,Math.max(1.3,+(v*(.85+rnd()*.4)).toFixed(2)))))));render()};
 $('#th').onchange=render;
 function loadFeed(){try{applyFeed(JSON.parse($('#fj').value));$('#fm').textContent='Loaded '+M.length+' meetings'}catch(e){$('#fm').textContent='Feed error: '+e.message}}
-function applyFeed(j){const ks=sel&&M[sel[0]]?[M[sel[0]].name,sel[1]]:null,bk=new Set();
- j.meetings.forEach(m=>m.races.forEach(r=>r&&r.runners.forEach(h=>Object.keys(h.odds).forEach(k=>bk.add(k)))));
- BK=[...bk];M.length=0;
- j.meetings.forEach(m=>{const rs=[];m.races.forEach((r,i)=>{if(r)rs[(r.n||i+1)-1]={startMs:r.start?+new Date(r.start):0,mins:r.start?Math.round((new Date(r.start)-Date.now())/6e4):r.mins,tipped:0,tipN:0,run:r.runners.map((h,k)=>({no:h.no||k+1,name:h.name,p:[0,1,2,3,4].map(x=>h.probs&&h.probs[x]!=null?h.probs[x]:null),o:BK.map(b=>h.odds[b]||0),st:h.style||'M',tips:h.tips||0,hint:h.hint||'',t:0}))}});M.push({name:m.name,code:m.code||'horse',c:m.country||'',reg:m.region||'anz',sky:m.sky?1:0,n:rs.length,races:rs})});
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const unesc=s=>String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&');
+/* Validates the whole feed first and only swaps it in if something usable came out, so a bad feed can never blank the screen.
+   Every third-party string (names, venues, bookmakers, hints) is HTML-escaped here, once, because the UI renders with innerHTML. */
+function applyFeed(j){
+ if(!j||!Array.isArray(j.meetings))throw new Error('feed has no meetings list');
+ if(!j.meetings.length){sel=null;M.length=0;render();return} // a valid, empty card (e.g. overnight): clear the screen rather than show stale races
+ const ks=sel&&M[sel[0]]?[M[sel[0]].name,sel[1]]:null,bk=new Set();
+ const ms=j.meetings.filter(m=>m&&Array.isArray(m.races));
+ ms.forEach(m=>m.races.forEach(r=>r&&Array.isArray(r.runners)&&r.runners.forEach(h=>h&&h.odds&&typeof h.odds==='object'&&Object.keys(h.odds).forEach(k=>bk.add(k)))));
+ const RAW=[...bk],price=v=>{v=+v;return v>1&&isFinite(v)?v:0},prob=v=>{v=v==null?NaN:+v;return isFinite(v)&&v>=0?v:null};
+ if(!RAW.length)throw new Error('feed has no bookmaker prices');
+ const out=[];
+ ms.forEach(m=>{const rs=[];m.races.forEach((r,i)=>{
+   if(!r||!Array.isArray(r.runners))return;
+   const startMs=r.start?+new Date(r.start):0,mins=r.start?Math.round((startMs-Date.now())/6e4):+r.mins;
+   if(!isFinite(mins))return;
+   const run=r.runners.filter(h=>h&&typeof h==='object').map((h,k)=>({no:+h.no||k+1,name:esc(h.name||'Runner '+(k+1)),p:[0,1,2,3,4].map(x=>prob(h.probs&&h.probs[x])),o:RAW.map(b=>price(h.odds&&h.odds[b])),st:['L','P','M','OM','BM'].includes(h.style)?h.style:'M',tips:+h.tips||0,hint:esc(h.hint||''),t:0}));
+   const idx=(+r.n||i+1)-1;
+   if(run.length<2||!(idx>=0&&idx<30)||run.every(x=>x.o.every(v=>!v)))return;
+   rs[idx]={startMs:isFinite(startMs)?startMs:0,mins,tipped:0,tipN:0,run}});
+  if(rs.some(Boolean))out.push({name:esc(m.name||'Meeting'),code:m.code==='greyhound'?'greyhound':'horse',c:esc(m.country||''),reg:m.region==='int'?'int':'anz',sky:m.sky?1:0,n:rs.length,races:rs})});
+ if(!out.length)throw new Error('feed had no usable races');
+ BK=RAW.map(esc);M.length=0;out.forEach(x=>M.push(x));
  const i=ks?M.findIndex(m=>m.name==ks[0]):-1;sel=i<0?null:[i,ks[1]];render()}
 /* Live feed: same-origin Worker endpoint (override with window.FEED_URL) */
 let live=false,pushMin=.8;
 function setStatus(t){$('#st').textContent=t;$('#sim').style.display=live?'none':'';$('#sn').style.display=live?'none':''}
 async function pollFeed(){try{const r=await fetch(window.FEED_URL||'/api/feed',{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();
- if(j.meetings&&j.meetings.length){if(j.notify){pushMin=j.notify.min/100;setPT(j.notify.min)}applyFeed(j);live=true;setStatus('● LIVE '+new Date(j.updated).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+(j.sources||[]).join(', ')+(j.notify&&j.notify.on?' · push alerts ≥'+j.notify.min+'%':''))}
- else if(!live)setStatus('SAMPLE DATA – no live sources configured')}catch(e){if(!live)setStatus('SAMPLE DATA – feed unreachable')}}
+ if(j.meetings&&j.meetings.length){if(j.notify){pushMin=j.notify.min/100;setPT(j.notify.min)}applyFeed(j);live=true;setStatus(((Date.now()-new Date(j.updated))/6e4>15?'⚠ STALE – last update ':'● LIVE ')+new Date(j.updated).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' · '+(j.sources||[]).join(', ')+(j.notify&&j.notify.on?' · push alerts ≥'+j.notify.min+'%':''))}
+ else if(live){applyFeed(j);setStatus('● LIVE · no races on the card right now (the feed refreshes during racing hours)')}else setStatus('SAMPLE DATA – no live sources configured')}catch(e){if(!live)setStatus('SAMPLE DATA – feed unreachable')}}
 $('#lf').onclick=loadFeed;
 let tkHTML='',tkX=0,tkW=1,tkPause=false,tkLast=0;const TK_SPEED=54;/* px per second, constant regardless of content */
 function setTicker(h){if(h===tkHTML)return;tkHTML=h;const el=$('#tk');el.innerHTML=h;const w1=el.scrollWidth||1,n=Math.max(2,Math.ceil(innerWidth*1.2/w1)+1);el.innerHTML=h.repeat(n);tkW=w1;tkX=tkX%w1}
